@@ -1,5 +1,5 @@
 import numpy as np
-from general_utils.transforms import rot2quat
+from general_utils.transform_utils import rot2quat
 
 imu_to_cam0 = np.array([[0, -1, 0, 0.1651],
                         [1, 0, 0, -0.1651],
