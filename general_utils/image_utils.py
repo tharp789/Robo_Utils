@@ -38,7 +38,8 @@ def load_image(file_path):
 
 def convert_dist_to_color(depth, max_dist=10.0):
     # Normalize the depth for visualization
-    depth = np.clip(depth, 0, max_dist)
+    if max_dist is not None:
+        depth = np.clip(depth, 0, max_dist)
     depth = (depth - np.min(depth)) / (np.max(depth) - np.min(depth))
     depth = (depth * 255).astype(np.uint8)
     depth = cv2.applyColorMap(depth, cv2.COLORMAP_JET)
