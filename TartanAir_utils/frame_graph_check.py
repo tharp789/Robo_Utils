@@ -90,7 +90,7 @@ def load_poses(pose_path):
 
 
 if __name__ == '__main__':
-    frame_graph_path = 'configs/frame_graph_artificial.json'
-    # check_frame_graph(frame_graph_path)
+    frame_graph_path = 'Robo_Utils/configs/frame_graph_artificial.json'
+    check_frame_graph(frame_graph_path)
     pose_path = '/home/tyler/Documents/Robo_Utils/data/Pose_000.txt'
-    visualize_trajectory(pose_path)
+    # visualize_trajectory(pose_path)

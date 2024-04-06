@@ -98,13 +98,14 @@ class TartanAirDataLoader:
                 lines = f.readlines()
             for line in lines:
                 pvec = np.array(list(map(float, line.split())))
-                w2r = make_transform_q(pvec[3:], pvec[:3])
+                r2w = make_transform_q(pvec[3:], pvec[:3])
                 r2c = self.camera_transforms_from_rig[cam]
                 r2c = make_transform_q(r2c[3:], r2c[:3])
-                w2c = w2r @ r2c
-                c2w = np.linalg.inv(w2c)
-                pose = T.dot(c2w).dot(T_inv)
-                self.pose_dict[cam][frame_num] = pose
+                c2w = r2w @ np.linalg.inv(r2c)
+
+                c2w = T.dot(c2w).dot(T_inv)
+                # c2w = np.linalg.inv(c2w)
+                self.pose_dict[cam][frame_num] = c2w
                 frame_num += 1
 
     def strip_frame_graph(self):
@@ -128,6 +129,7 @@ class TartanAirDataLoader:
         c2w = self.pose_dict[cam_name][frame_num]
 
         return rgb_img, depth_img, c2w
+    
 
         
 if __name__ == '__main__':

@@ -32,6 +32,17 @@ def make_transform_rotmatrix(R, t):
     return T
 
 def make_transform_q(quat, pos):
+    '''
+    Make a 4x4 transformation matrix from a quaternion and a position
+    
+    Args:
+    quat: 4 element list, quaternion
+    pos: 3 element list, position
+    
+    Returns:
+    4x4 numpy array, transformation matrix
+    '''
+    
     R = quat2rot(quat)
     return make_transform_rotmatrix(R, pos)
 
