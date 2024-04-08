@@ -2,13 +2,14 @@ import json
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
-import cv2
 import sys
 import os
 
-sys.path.insert(0, '/home/tyler/Documents/Robo_Utils/general_utils')
-from transform_utils import rot2quat, quat2rot, make_transform_q
-import image_utils as io
+# sys.path.insert(0, '/home/tyler/Documents/Robo_Utils/general_utils')
+# sys.path.append(0, '../Robo_Utils/general_utils/transform_utils.py')
+
+from ..general_utils.transform_utils import rot2quat, quat2rot, make_transform_q
+from ..general_utils.image_utils import load_image, load_depth
 
 
 class TartanAirDataLoader:
@@ -38,6 +39,7 @@ class TartanAirDataLoader:
         for path in trajectory_list:
             if trajectory_name in path:
                 self.trajectory_path = self.data_folder + '/' + path
+        assert self.trajectory_path is not None, "Trajectory name given was not found"
 
         self.camera_list = []
         assert self.trajectory_path is not None, "Trajectory name given was not found"
@@ -46,6 +48,9 @@ class TartanAirDataLoader:
                 self.pose_path = self.trajectory_path + '/' + path
             elif "cam" in path or "Cam" in path or "CAM" in path:
                 self.camera_list.append(path)
+
+        assert self.pose_path is not None, "Pose file not found"
+        assert len(self.camera_list) > 0, "No camera folders found"
         
         # load pose file
         self.load_poses()
@@ -63,7 +68,7 @@ class TartanAirDataLoader:
             self.mask_dict[cam] = {}
             for img in img_list:
                 if "mask" in img:
-                    self.mask_dict[cam] = io.load_image(camera_img_folder + '/' + img)
+                    self.mask_dict[cam] = load_image(camera_img_folder + '/' + img)
                 else:
                     img_index = int(img.split('.')[0].split('_')[0])
                     if "depth" in img or "Depth" in img or "Dist" in img or "dist" in img:
@@ -85,11 +90,11 @@ class TartanAirDataLoader:
     def load_poses(self):
         self.pose_dict = {}
         frame_num = 0
-        T = np.array([[0,1,0,0],
+        ned2cv = np.array([[0,1,0,0],
                     [0,0,1,0],
                     [1,0,0,0],
                     [0,0,0,1]], dtype=np.float32)
-        T_inv = np.linalg.inv(T)
+        cv2ned = np.linalg.inv(ned2cv)
 
         for cam in self.camera_list:
             frame_num = 0
@@ -97,14 +102,15 @@ class TartanAirDataLoader:
             with open(self.pose_path, "r") as f:
                 lines = f.readlines()
             for line in lines:
-                pvec = np.array(list(map(float, line.split())))
-                r2w = make_transform_q(pvec[3:], pvec[:3])
-                r2c = self.camera_transforms_from_rig[cam]
-                r2c = make_transform_q(r2c[3:], r2c[:3])
-                c2w = r2w @ np.linalg.inv(r2c)
+                r2w_ned = np.array(list(map(float, line.split())))
+                r2w_ned = make_transform_q(r2w_ned[3:], r2w_ned[:3])
 
-                c2w = T.dot(c2w).dot(T_inv)
-                # c2w = np.linalg.inv(c2w)
+                # is this ned? 
+                r2c_ned = self.camera_transforms_from_rig[cam]
+                r2c_ned = make_transform_q(r2c_ned[3:], r2c_ned[:3])
+                
+                # c2w = ned2cv @ c2r @ cv2ned
+                # c2w = r2w @ c2r
                 self.pose_dict[cam][frame_num] = c2w
                 frame_num += 1
 
@@ -124,8 +130,8 @@ class TartanAirDataLoader:
             self.camera_transforms_from_rig[camera] = t_rig_cam
 
     def get_one_frame(self, frame_num, cam_name):
-        rgb_img = io.load_image(self.rgb_img_dict[cam_name][frame_num])
-        depth_img = io.read_compressed_float(self.depth_img_dict[cam_name][frame_num])
+        rgb_img = load_image(self.rgb_img_dict[cam_name][frame_num])
+        depth_img = load_depth(self.depth_img_dict[cam_name][frame_num])
         c2w = self.pose_dict[cam_name][frame_num]
 
         return rgb_img, depth_img, c2w

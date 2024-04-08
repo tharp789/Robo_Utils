@@ -5,8 +5,7 @@ from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import sys
 
-sys.path.insert(0, '/home/tyler/Documents/Robo_Utils/general_utils')
-import transform_utils as transforms
+from ..general_utils.transform_utils import rot2quat, quat2rot, make_transform_q
 
 def check_frame_graph(frame_graph_path):
     with open(frame_graph_path, 'r') as frame_graph_path:

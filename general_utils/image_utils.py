@@ -46,12 +46,19 @@ def convert_dist_to_color(depth, max_dist=10.0):
     return depth
 
 if __name__ == '__main__':
-    print('Testing image_utils.py')
-    img = read_image('test_rgb_image.png')
-    cv2.imshow('test_rgb_image', img)
-    cv2.waitKey(0) 
-    depth = read_compressed_float('test_depth_image.png')
-    depth = convert_dist_to_color(depth)
-    cv2.imshow('test_depth', depth)
-    cv2.waitKey(0) 
-    print('Done testing image_utils.py')
+    # print('Testing image_utils.py')
+    # img = read_image('test_rgb_image.png')
+    # cv2.imshow('test_rgb_image', img)
+    # cv2.waitKey(0) 
+    depth = read_compressed_float('/media/tharp/Extreme SSD3/Gascola_Processed_Stereo_04042024/Gascola_RawData/Pose_easy_000/cam0/000003_pinholeDistance.png')
+    depth = convert_dist_to_color(depth, max_dist=30.0)
+    cv2.imwrite('pinhole_depth_image.png', depth)
+
+    depth = read_compressed_float('/media/tharp/Extreme SSD3/Gascola_Processed_Top_Cams_04042024/Gascola_RawData/Pose_easy_000/cam0/000003_FisheyeDistance.png')
+    depth = convert_dist_to_color(depth, max_dist=30.0)
+    cv2.imwrite('fisheye_depth_image.png', depth)
+
+
+    # cv2.imshow('test_depth', depth)
+    # cv2.waitKey(0) 
+    # print('Done testing image_utils.py')
