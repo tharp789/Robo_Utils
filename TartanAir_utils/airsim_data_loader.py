@@ -5,11 +5,13 @@ import numpy as np
 import sys
 import os
 
-# sys.path.insert(0, '/home/tyler/Documents/Robo_Utils/general_utils')
-# sys.path.append(0, '../Robo_Utils/general_utils/transform_utils.py')
+sys.path.insert(0, '/home/tyler/Documents/Robo_Utils/general_utils')
+from transform_utils import make_transform_q, quat2rot, rot2quat
+from image_utils import load_image, load_depth
+# sys.path.append('../general_utils')
 
-from ..general_utils.transform_utils import rot2quat, quat2rot, make_transform_q
-from ..general_utils.image_utils import load_image, load_depth
+# from ..general_utils.transform_utils import make_transform_q
+# from ..general_utils.image_utils import load_image, load_depth
 
 
 class TartanAirDataLoader:
@@ -20,19 +22,20 @@ class TartanAirDataLoader:
 
         # get config files
         for path in dir_list:
-            if "metadata" in path:
+            if "metadata.json" in path:
                 metadata_path = data_dir + path
                 with open(metadata_path, 'r') as metadata_file:
                     self.metadata = json.load(metadata_file)
-            if "frame_graph" in path:
+            if "frame_graph.json" in path:
                 frame_graph_path = data_dir + path
                 with open(frame_graph_path, 'r') as frame_graph_file:
                     self.frame_graph = json.load(frame_graph_file)
                     self.strip_frame_graph()
-            if "manifest" in path:
+            if "manifest.json" in path:
                 manifest_path = data_dir + path
                 with open(manifest_path, 'r') as manifest_file:
                     self.manifest = json.load(manifest_file)
+                    self.strip_manifest()
             if os.path.isdir(data_dir + path):
                 self.data_folder = data_dir + path
         trajectory_list = os.listdir(self.data_folder)
@@ -44,10 +47,11 @@ class TartanAirDataLoader:
         self.camera_list = []
         assert self.trajectory_path is not None, "Trajectory name given was not found"
         for path in os.listdir(self.trajectory_path):
-            if "pose" in path or "Pose" in path or "POSE" in path:
+            if "Pose" in path and ".txt" in path:
                 self.pose_path = self.trajectory_path + '/' + path
             elif "cam" in path or "Cam" in path or "CAM" in path:
-                self.camera_list.append(path)
+                if os.path.isdir(self.trajectory_path + '/' + path):
+                    self.camera_list.append(path)
 
         assert self.pose_path is not None, "Pose file not found"
         assert len(self.camera_list) > 0, "No camera folders found"
@@ -95,24 +99,37 @@ class TartanAirDataLoader:
                     [1,0,0,0],
                     [0,0,0,1]], dtype=np.float32)
         cv2ned = np.linalg.inv(ned2cv)
-
+        
         for cam in self.camera_list:
             frame_num = 0
             self.pose_dict[cam] = {}
             with open(self.pose_path, "r") as f:
                 lines = f.readlines()
-            for line in lines:
+            for i, line in enumerate(lines):
                 r2w_ned = np.array(list(map(float, line.split())))
                 r2w_ned = make_transform_q(r2w_ned[3:], r2w_ned[:3])
 
-                # is this ned? 
-                r2c_ned = self.camera_transforms_from_rig[cam]
-                r2c_ned = make_transform_q(r2c_ned[3:], r2c_ned[:3])
-                
-                # c2w = ned2cv @ c2r @ cv2ned
-                # c2w = r2w @ c2r
-                self.pose_dict[cam][frame_num] = c2w
+                r2c = self.camera_transforms_from_rig[cam]
+                r2c = make_transform_q(r2c[3:], r2c[:3])
+                c2w_ned = self.transform_pose(r2w_ned[:3,3], r2c[:3,3], r2w_ned[:3,:3])
+
+                c2im = self.image_transforms_from_camera[cam]
+                im2c = np.linalg.inv(c2im)
+
+                im2w_cv = ned2cv @ c2w_ned @ cv2ned @ im2c
+
+                self.pose_dict[cam][frame_num] = im2w_cv
                 frame_num += 1
+
+    def strip_manifest(self):
+        self.image_transforms_from_camera = {}
+        for sampler in self.manifest['samplers']:
+            transform = np.eye(4)
+            rotation_matrix = sampler['sampler']['orientation']['data']
+            rotation_matrix = np.array(rotation_matrix).reshape(3,3)
+            transform[:3,:3] = rotation_matrix
+            camera = sampler['mvs_cam_key']
+            self.image_transforms_from_camera[camera] = transform
 
     def strip_frame_graph(self):
         transforms = self.frame_graph['transforms']
@@ -137,8 +154,25 @@ class TartanAirDataLoader:
         return rgb_img, depth_img, c2w
     
 
+    def transform_pose(self, rig_pos, cam_pos, orientation):
+            '''
+            Transforms a local cam_pos w.r.t. to the rig frame into a point in the global NED AirSim Frame.
+            '''
+            #Rotate the cam_pos 3D vector by the orientation quaternion
+            # rotcam = orientation * Quaternionr(*cam_pos, 0.0) * orientation.inverse()
+
+            pos_delta = orientation @ cam_pos.reshape(3,1)
+
+            #Shift the rotated local camera pose vector with the rig_pos to transform it to the NED AirSim global frame.
+            newpos = rig_pos.reshape(3,1) + pos_delta
+            newtransform = np.eye(4)
+            newtransform[:3,3] = newpos.squeeze()
+            newtransform[:3,:3] = orientation[:3,:3]
+            return newtransform
+    
+
         
 if __name__ == '__main__':
-    data_loader = TartanAirDataLoader('/media/tyler/Extreme SSD/Gascola_Processed_Stereo_04022024/','Pose_easy_000')
+    data_loader = TartanAirDataLoader('/media/tyler/Extreme SSD/Gascola_Processed_Stereo_04042024/','Pose_easy_000')
     rgb_img, depth_img, pose = data_loader.get_one_frame(0, 'cam0')
     print(pose)

@@ -5,7 +5,10 @@ from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import sys
 
-from ..general_utils.transform_utils import rot2quat, quat2rot, make_transform_q
+# from ..general_utils.transform_utils import rot2quat, quat2rot, make_transform_q
+sys.path.insert(0, '/home/tyler/Documents/Robo_Utils/general_utils')
+from transform_utils import make_transform_q, quat2rot, rot2quat
+from image_utils import load_image, load_depth
 
 def check_frame_graph(frame_graph_path):
     with open(frame_graph_path, 'r') as frame_graph_path:
@@ -44,7 +47,7 @@ def get_lines_for_coord_frame(quaternion, position, scaling=1.0):
     initial_points = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]])
     initial_points = scaling * initial_points
     initial_points = initial_points.T
-    rotation_matrix = transforms.quat2rot(quaternion)
+    rotation_matrix = quat2rot(quaternion)
     rotated_points = np.dot(rotation_matrix, initial_points)
     rotated_points = rotated_points.T
     rotated_points += position
