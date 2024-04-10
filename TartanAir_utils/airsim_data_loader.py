@@ -116,7 +116,8 @@ class TartanAirDataLoader:
                 c2im = self.image_transforms_from_camera[cam]
                 im2c = np.linalg.inv(c2im)
 
-                im2w_cv = ned2cv @ c2w_ned @ cv2ned @ im2c
+                # im2w_cv = ned2cv @ c2w_ned @ cv2ned @ im2c #this works for pinhole cameras
+                im2w_cv = ned2cv @ c2w_ned @ cv2ned @ c2im #this works for pinhole cameras
 
                 self.pose_dict[cam][frame_num] = im2w_cv
                 frame_num += 1
