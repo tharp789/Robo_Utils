@@ -25,13 +25,25 @@ def euler2rot(e):
     r = Rot.from_euler('xyz', e)
     return r.as_matrix()
 
-def make_transform_rm(R, t):
+def make_transform_rotmatrix(R, t):
     T = np.eye(4)
     T[:3, :3] = R
     T[:3, 3] = t
     return T
 
-def make_transform_q(q, t):
-    R = quat2rot(q)
-    return make_transform_rm(R, t)
+def make_transform_q(quat, pos):
+    '''
+    Make a 4x4 transformation matrix from a quaternion and a position
+    
+    Args:
+    quat: 4 element list, quaternion
+    pos: 3 element list, position
+    
+    Returns:
+    4x4 numpy array, transformation matrix
+    '''
+    
+    R = quat2rot(quat)
+    return make_transform_rotmatrix(R, pos)
+
 
