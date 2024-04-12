@@ -5,14 +5,12 @@ import numpy as np
 import sys
 import os
 
-sys.path.insert(0, '/home/tyler/Documents/Robo_Utils/general_utils')
-from transform_utils import make_transform_q, quat2rot, rot2quat
-from image_utils import load_image, load_depth
-# sys.path.append('../general_utils')
+_CURRENT_PATH       = os.path.dirname(os.path.realpath(__file__))
+_TOP_PATH           = os.path.join(_CURRENT_PATH, '..')
+sys.path.append(_TOP_PATH)
 
-# from ..general_utils.transform_utils import make_transform_q
-# from ..general_utils.image_utils import load_image, load_depth
-
+from general_utils.transform_utils import make_transform_q
+from general_utils.image_utils import load_image, load_depth
 
 class TartanAirDataLoader:
     def __init__(self, data_dir, trajectory_name):
