@@ -2,7 +2,10 @@ import rospy
 import rosbag
 from cv_bridge import CvBridge
 import cv2
+import open3d as o3d
 import os
+from sensor_msgs import point_cloud2
+import numpy as np
 
 def extract_images_from_rosbag(rosbag_file_path, output_location, topic_name='/image'):
     # Create output folder if it doesn't exist
@@ -49,17 +52,23 @@ def extract_pointclouds_from_rosbag(rosbag_file_path, output_location, topic_nam
             if topic == topic_name:  # Change '/velodyne_points' to your actual pointcloud topic
                 # Get timestamp
                 timestamp = msg.header.stamp.to_nsec()
+                # Generate a file name based on the topic and timestamp
+                filename = "{}.pcd".format(str(timestamp))
+                file_path = os.path.join(output_location, filename)
+                
+                # Convert the PointCloud2 message to PCD format
+                points_msg = point_cloud2.read_points(msg)
+                pointcloud = o3d.geometry.PointCloud()
+                np_points = np.array(list(points_msg))
+                pointcloud.points = o3d.utility.Vector3dVector(np_points[:, :3])
+                o3d.io.write_point_cloud(file_path, pointcloud)
 
-                # Save pointcloud with timestamp as filename
-                pointcloud_filename = os.path.join(output_location, f"{timestamp}.pcd")
-                with open(pointcloud_filename, 'w') as f:
-                    f.write(msg)
-                print(f"Saved pointcloud {pointcloud_count}/{total_pointclouds} to {pointcloud_filename}")
+                print(f"Saved pointcloud {pointcloud_count}/{total_pointclouds} to {file_path}")
                 pointcloud_count+=1
 
 if __name__ == "__main__":
-    rosbag_file = "/home/tyler/Documents/rosbag_mp4_wkspc/run4_cam0.bag"
+    rosbag_file = "/media/tyler/Extreme SSD/Field_Tests/Gascola/run3_static/lidar_points.bag"
 
-    output_folder = "/media/tyler/Extreme SSD/Nardo_Runs/run4_night/run4_cam0_imgs/"
+    output_folder = "/media/tyler/Extreme SSD/Field_Tests/Gascola/run3_static/pcd_files/"
 
-    extract_images_from_rosbag(rosbag_file, output_folder)
+    extract_pointclouds_from_rosbag(rosbag_file, output_folder, topic_name='/velodyne_points')
