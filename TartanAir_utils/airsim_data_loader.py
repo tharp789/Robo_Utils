@@ -13,7 +13,7 @@ from general_utils.transform_utils import make_transform_q
 from general_utils.image_utils import load_image, load_depth
 
 class TartanAirDataLoader:
-    def __init__(self, data_dir, trajectory_name):
+    def __init__(self, data_dir, trajectory_name, include_panoes=False):
         self.data_dir = data_dir
         self.run_name = data_dir.split('/')[-2]
         dir_list = os.listdir(data_dir)
@@ -33,7 +33,6 @@ class TartanAirDataLoader:
                 manifest_path = data_dir + path
                 with open(manifest_path, 'r') as manifest_file:
                     self.manifest = json.load(manifest_file)
-                    self.strip_manifest()
             if os.path.isdir(data_dir + path):
                 self.data_folder = data_dir + path
         trajectory_list = os.listdir(self.data_folder)
@@ -47,36 +46,68 @@ class TartanAirDataLoader:
         for path in os.listdir(self.trajectory_path):
             if "Pose" in path and ".txt" in path:
                 self.pose_path = self.trajectory_path + '/' + path
-            elif "cam" in path or "Cam" in path or "CAM" in path:
+            elif "cam" in path or "Cam" in path or "CAM" in path or 'rig' in path or 'Rig' in path or 'RIG' in path:
                 if os.path.isdir(self.trajectory_path + '/' + path):
                     self.camera_list.append(path)
+        if include_panoes:
+            self.camera_list.append('rig_pano')
+
+        self.strip_manifest()
 
         assert self.pose_path is not None, "Pose file not found"
         assert len(self.camera_list) > 0, "No camera folders found"
         
         # load pose file
-        self.load_poses()
+        self.load_poses(include_panoes=include_panoes)
 
         # load image file paths into a dictionaries
         self.depth_img_dict = {}
         self.rgb_img_dict = {}
         self.mask_dict = {}
         for cam in self.camera_list:
-            camera_img_folder = self.trajectory_path + '/' + cam
-            img_list = os.listdir(camera_img_folder)
-            img_list.sort()
-            self.depth_img_dict[cam] = {}
-            self.rgb_img_dict[cam] = {}
-            self.mask_dict[cam] = {}
-            for img in img_list:
-                if "mask" in img:
-                    self.mask_dict[cam] = load_image(camera_img_folder + '/' + img)
-                else:
-                    img_index = int(img.split('.')[0].split('_')[0])
-                    if "depth" in img or "Depth" in img or "Dist" in img or "dist" in img:
-                        self.depth_img_dict[cam][img_index] = camera_img_folder + '/' + img
+            if 'cam' in cam:
+                camera_img_folder = self.trajectory_path + '/' + cam
+                img_list = os.listdir(camera_img_folder)
+                img_list.sort()
+                self.depth_img_dict[cam] = {}
+                self.rgb_img_dict[cam] = {}
+                self.mask_dict[cam] = {}
+                for img in img_list:
+                    if "mask" in img:
+                        self.mask_dict[cam] = load_image(camera_img_folder + '/' + img)
                     else:
-                        self.rgb_img_dict[cam][img_index] = camera_img_folder + '/' + img
+                        img_index = int(img.split('.')[0].split('_')[0])
+                        if "depth" in img or "Depth" in img or "Dist" in img or "dist" in img:
+                            self.depth_img_dict[cam][img_index] = camera_img_folder + '/' + img
+                        else:
+                            self.rgb_img_dict[cam][img_index] = camera_img_folder + '/' + img
+            elif 'rig' in cam and 'pano' not in cam:
+                camera_img_folder = self.trajectory_path + '/' + cam
+                img_list = os.listdir(camera_img_folder)
+                img_list.sort()
+                self.depth_img_dict[cam] = {}
+                self.rgb_img_dict[cam] = {}
+                self.mask_dict[cam] = {}
+                if include_panoes:
+                    self.depth_img_dict['rig_pano'] = {}
+                    self.rgb_img_dict['rig_pano'] = {}
+                    self.mask_dict['rig_pano'] = {}
+
+                for img in img_list:
+                    if "mask" in img:
+                        self.mask_dict[cam] = load_image(camera_img_folder + '/' + img)
+                    else:
+                        img_index = int(img.split('.')[0].split('_')[0])
+                        if "depth" in img or "Depth" in img or "Dist" in img or "dist" in img:
+                            if 'Scene' in img and include_panoes:
+                                self.depth_img_dict['rig_pano'][img_index] = camera_img_folder + '/' + img
+                            else:
+                                self.depth_img_dict[cam][img_index] = camera_img_folder + '/' + img
+                        else:
+                            if 'Scene' in img and include_panoes:
+                                self.rgb_img_dict['rig_pano'][img_index] = camera_img_folder + '/' + img
+                            else:
+                                self.rgb_img_dict[cam][img_index] = camera_img_folder + '/' + img
 
         self.num_imgs = len(self.rgb_img_dict[self.camera_list[0]])
         # remove any camera transforms that are not needed
@@ -89,7 +120,7 @@ class TartanAirDataLoader:
 
         print("Data loader finished")
 
-    def load_poses(self):
+    def load_poses(self, include_panoes):
         self.pose_dict = {}
         frame_num = 0
         ned2cv = np.array([[0,1,0,0],
@@ -98,36 +129,65 @@ class TartanAirDataLoader:
                     [0,0,0,1]], dtype=np.float32)
         cv2ned = np.linalg.inv(ned2cv)
         
-        for cam in self.camera_list:
-            frame_num = 0
-            self.pose_dict[cam] = {}
-            with open(self.pose_path, "r") as f:
-                lines = f.readlines()
-            for i, line in enumerate(lines):
-                r2w_ned = np.array(list(map(float, line.split())))
-                r2w_ned = make_transform_q(r2w_ned[3:], r2w_ned[:3])
+        with open(self.pose_path, "r") as f:
+            lines = f.readlines()
+            for cam in self.camera_list:
+                if 'cam' in cam:
+                    frame_num = 0
+                    self.pose_dict[cam] = {}
+                    for i, line in enumerate(lines):
+                        r2w_ned = np.array(list(map(float, line.split())))
+                        r2w_ned = make_transform_q(r2w_ned[3:], r2w_ned[:3])
 
-                r2c = self.camera_transforms_from_rig[cam]
-                r2c = make_transform_q(r2c[3:], r2c[:3])
-                c2w_ned = self.transform_pose(r2w_ned[:3,3], r2c[:3,3], r2w_ned[:3,:3])
+                        r2c = self.camera_transforms_from_rig[cam]
+                        r2c = make_transform_q(r2c[3:], r2c[:3])
+                        c2w_ned = self.transform_pose(r2w_ned[:3,3], r2c[:3,3], r2w_ned[:3,:3])
 
-                c2im = self.image_transforms_from_camera[cam]
+                        c2im = self.image_transforms_from_camera[cam]
 
-                im2w_cv = ned2cv @ c2w_ned @ cv2ned @ c2im #this works for pinhole cameras
+                        im2w_cv = ned2cv @ c2w_ned @ cv2ned @ c2im
 
-                self.pose_dict[cam][frame_num] = im2w_cv
-                frame_num += 1
+                        self.pose_dict[cam][frame_num] = im2w_cv
+                        frame_num += 1
+                if cam == 'rig':
+                    frame_num = 0
+                    self.pose_dict[cam] = {}
+                    if include_panoes:
+                        self.pose_dict['rig_pano'] = {}
+                    for i, line in enumerate(lines):
+                        r2w_ned = np.array(list(map(float, line.split())))
+                        r2w_ned = make_transform_q(r2w_ned[3:], r2w_ned[:3])
+                        c2im_fisheye = self.image_transforms_from_camera[cam]
+                        c2im_pano = self.image_transforms_from_camera['rig_pano']
+                        im2w_cv_fisheye = ned2cv @ r2w_ned @ cv2ned @ c2im_fisheye
+                        im2w_cv_pano = ned2cv @ r2w_ned @ cv2ned @ c2im_pano
+                        self.pose_dict[cam][frame_num] = im2w_cv_fisheye
+                        if include_panoes:
+                            self.pose_dict['rig_pano'][frame_num] = im2w_cv_pano
+                        frame_num += 1
 
-    def strip_manifest(self):
+    def strip_manifest(self, include_panoes=False):
         self.image_transforms_from_camera = {}
+        # for camera in self.camera_list:
+        #     self.image_transforms_from_camera[camera] = {}
         for sampler in self.manifest['samplers']:
-            transform = np.eye(4)
-            rotation_matrix = sampler['sampler']['orientation']['data']
-            rotation_matrix = np.array(rotation_matrix).reshape(3,3)
-            transform[:3,:3] = rotation_matrix
             camera = sampler['mvs_cam_key']
-            self.image_transforms_from_camera[camera] = transform
-
+            if 'cam' in camera:
+                transform = np.eye(4)
+                rotation_matrix = sampler['sampler']['orientation']['data']
+                rotation_matrix = np.array(rotation_matrix).reshape(3,3)
+                transform[:3,:3] = rotation_matrix
+                self.image_transforms_from_camera[camera] = transform
+            if 'rig' in camera:
+                transform = np.eye(4)
+                rotation_matrix = sampler['sampler']['orientation']['data']
+                rotation_matrix = np.array(rotation_matrix).reshape(3,3)
+                transform[:3,:3] = rotation_matrix
+                if 'fisheye' in sampler['description']:
+                    self.image_transforms_from_camera[camera]= transform
+                else:
+                    self.image_transforms_from_camera['rig_pano'] = transform
+            
     def strip_frame_graph(self):
         transforms = self.frame_graph['transforms']
         camera_transforms = {}
@@ -143,12 +203,18 @@ class TartanAirDataLoader:
             t_rig_cam = np.hstack((camera_position, quat))
             self.camera_transforms_from_rig[camera] = t_rig_cam
 
-    def get_one_frame(self, frame_num, cam_name):
-        rgb_img = load_image(self.rgb_img_dict[cam_name][frame_num])
-        depth_img = load_depth(self.depth_img_dict[cam_name][frame_num])
-        c2w = self.pose_dict[cam_name][frame_num]
-
-        return rgb_img, depth_img, c2w
+    def get_one_frame(self, frame_num):
+        rgb_dict = {}
+        depth_dict = {}
+        pose_dict = {}
+        for cam in self.camera_list:
+            rgb_img = load_image(self.rgb_img_dict[cam][frame_num])
+            depth_img = load_depth(self.depth_img_dict[cam][frame_num])
+            c2w = self.pose_dict[cam][frame_num]
+            rgb_dict[cam] = rgb_img
+            depth_dict[cam] = depth_img
+            pose_dict[cam] = c2w
+        return rgb_dict, depth_dict, pose_dict
     
 
     def transform_pose(self, rig_pos, cam_pos, orientation):
@@ -170,6 +236,6 @@ class TartanAirDataLoader:
 
         
 if __name__ == '__main__':
-    data_loader = TartanAirDataLoader('/media/tyler/Extreme SSD/Gascola_Processed_Stereo_04042024/','Pose_easy_000')
-    rgb_img, depth_img, pose = data_loader.get_one_frame(0, 'cam0')
-    print(pose)
+    data_loader = TartanAirDataLoader('/media/tyler/Extreme SSD/Gascola_Processed_Top_Cams_04092024/','Pose_easy_000', include_panoes=True)
+    rgb_img, depth_img, pose = data_loader.get_one_frame(0)
+    print("RGB Image shape: ", rgb_img['cam0'].shape)

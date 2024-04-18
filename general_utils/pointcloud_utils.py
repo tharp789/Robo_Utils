@@ -1,6 +1,7 @@
 import numpy as np
 import open3d as o3d
 import os
+import cv2 
 
 def read_pcd_as_numpy(pcd_path):
     pcd = o3d.io.read_point_cloud(pcd_path)
@@ -39,12 +40,12 @@ def render_image_from_pc_and_camera(point_cloud, camera_extrinsics, camera_intri
         cam.extrinsic = camera_extrinsics
         cam.intrinsic = o3d.camera.PinholeCameraIntrinsic(camera_width, camera_height, camera_intrinsics)
 
-        # cameraLines = o3d.geometry.LineSet.create_camera_visualization(intrinsic=cam.intrinsic, extrinsic=cam.extrinsic)
-        # o3d.visualization.draw_geometries([point_cloud, cameraLines])
+        cameraLines = o3d.geometry.LineSet.create_camera_visualization(intrinsic=cam.intrinsic, extrinsic=cam.extrinsic)
+        o3d.visualization.draw_geometries([point_cloud, cameraLines])
 
         material = o3d.visualization.rendering.MaterialRecord()
         material.shader = "defaultUnlit"
-        material.point_size = 1.0
+        material.point_size = 2.0
         render.scene.set_background([0.0, 0.0, 0.0, 0.0])
 
         render.scene.add_geometry("point_cloud", point_cloud, material)
@@ -59,6 +60,31 @@ def render_image_from_pc_and_camera(point_cloud, camera_extrinsics, camera_intri
 
 if __name__ == "__main__":
     pcd_path = "/media/tyler/Extreme SSD/Field_Tests/Gascola/run3_static/pcd_files"
-    point_cloud = combine_pcd_files_from_folder(pcd_path, 0, 50)
-    visualize_pcd(point_cloud)
+    point_cloud = combine_pcd_files_from_folder(pcd_path, 400, 1)
+    # visualize_pcd(point_cloud)
 
+    # T_to_from
+    T_imu_lidar = np.eye(4)
+    rotation = np.radians(180)
+    T_imu_lidar[:3, :3] = np.array(
+        [[np.cos(rotation), -np.sin(rotation), 0], [np.sin(rotation), np.cos(rotation), 0], [0, 0, 1]]
+    )
+    T_imu_lidar[:3, 3] = np.array([-0.116655, 0.0, 0.082 + 0.0377])
+
+    T_imu_camL = np.array([[-0.02058918, -0.01494092, -0.99967638, -0.33820075],
+                           [ 0.99974732,  0.0087145,  -0.02072088, -0.12171665],
+                           [ 0.00902127, -0.9998504,   0.01475772,   0.0218635],
+                           [ 0.        ,  0.        ,  0.        ,  1.        ]])
+    
+    T_camL_lidar = np.linalg.inv(T_imu_camL) @ T_imu_lidar
+
+    intrinsics = np.array([406.33233091474426, 406.9536696029995, 311.51174613074784, 241.75862889759748])
+    intrinsics_matrix = np.array([[intrinsics[0], 0, intrinsics[2]], [0, intrinsics[1], intrinsics[3]], [0, 0, 1]])
+
+    depth_img = render_image_from_pc_and_camera(point_cloud, T_camL_lidar, intrinsics_matrix, 640, 512, max_depth=20)
+
+
+    depth_img = cv2.normalize(depth_img, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
+    depth_img = cv2.applyColorMap(depth_img, cv2.COLORMAP_MAGMA)
+    cv2.imshow("Depth Image", depth_img)
+    cv2.waitKey(0)
