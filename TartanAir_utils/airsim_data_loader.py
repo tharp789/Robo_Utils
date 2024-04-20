@@ -9,7 +9,7 @@ _CURRENT_PATH       = os.path.dirname(os.path.realpath(__file__))
 _TOP_PATH           = os.path.join(_CURRENT_PATH, '..')
 sys.path.append(_TOP_PATH)
 
-from general_utils.transform_utils import make_transform_q
+from general_utils.transform_utils import make_transform_q, rot2quat, quat2rot 
 from general_utils.image_utils import load_image, load_depth
 
 class TartanAirDataLoader:
@@ -59,6 +59,7 @@ class TartanAirDataLoader:
         
         # load pose file
         self.load_poses(include_panoes=include_panoes)
+        self.save_poses('')
 
         # load image file paths into a dictionaries
         self.depth_img_dict = {}
@@ -157,14 +158,25 @@ class TartanAirDataLoader:
                     for i, line in enumerate(lines):
                         r2w_ned = np.array(list(map(float, line.split())))
                         r2w_ned = make_transform_q(r2w_ned[3:], r2w_ned[:3])
-                        c2im_fisheye = self.image_transforms_from_camera[cam]
-                        c2im_pano = self.image_transforms_from_camera['rig_pano']
-                        im2w_cv_fisheye = ned2cv @ r2w_ned @ cv2ned @ c2im_fisheye
-                        im2w_cv_pano = ned2cv @ r2w_ned @ cv2ned @ c2im_pano
-                        self.pose_dict[cam][frame_num] = im2w_cv_fisheye
+                        c2im = self.image_transforms_from_camera[cam]
+                        im2w_cv = ned2cv @ r2w_ned @ cv2ned @ c2im
+                        self.pose_dict[cam][frame_num] = im2w_cv
+
                         if include_panoes:
+                            c2im_pano = self.image_transforms_from_camera['rig_pano']
+                            im2w_cv_pano = ned2cv @ r2w_ned @ cv2ned @ c2im_pano
                             self.pose_dict['rig_pano'][frame_num] = im2w_cv_pano
                         frame_num += 1
+
+    def save_poses(self, save_path, camera):
+        poses = self.pose_dict[camera]
+        with open(save_path, 'w') as f:
+            for i in range(len(poses)):
+                pose = poses[i]
+                quat = rot2quat(pose[:3,:3])
+                t = pose[:3,3]
+                f.write(f"{t[0]} {t[1]} {t[2]} {quat[0]} {quat[1]} {quat[2]} {quat[3]}\n")
+
 
     def strip_manifest(self, include_panoes=False):
         self.image_transforms_from_camera = {}
@@ -183,7 +195,7 @@ class TartanAirDataLoader:
                 rotation_matrix = sampler['sampler']['orientation']['data']
                 rotation_matrix = np.array(rotation_matrix).reshape(3,3)
                 transform[:3,:3] = rotation_matrix
-                if 'fisheye' in sampler['description']:
+                if 'fisheye' or 'pinhole' in sampler['description']:
                     self.image_transforms_from_camera[camera]= transform
                 else:
                     self.image_transforms_from_camera['rig_pano'] = transform
