@@ -56,12 +56,14 @@ def read_and_enhance_thermals(data_path, output_data_path, type):
             assert os.path.exists(data_path + file), "File not found: " + data_path + file
             img = cv2.imread(data_path + file, cv2.IMREAD_UNCHANGED)
             img = process_image(img, type)
+            # cv2.imwrite(output_data_path + file, img)
+            file = f'/{i}.png'
             cv2.imwrite(output_data_path + file, img)
             print("Processed: " + str(i) + " / " + str(tot_img_num) + " images")
 
 if __name__ == '__main__':
-    data_path = '/media/tyler/T7/field_dataset/hawkins_2_2/img_left/'
-    output_data_path = '/media/tyler/T7/field_dataset/hawkins_2_2/enhanced_left/'
+    data_path = '/media/tyler/T7/thermal_inference/'
+    output_data_path = '/media/tyler/T7/thermal_inference/enhanced/'
     # data_path = '/media/tyler/T7/field_dataset/frick_2_train/img_left/'
     # output_data_path = '/media/tyler/T7/field_dataset/frick_2_train/enhanced_left/'
     # data_path = '/media/tyler/T7/field_dataset/hawkins_3_train/img_left/'
