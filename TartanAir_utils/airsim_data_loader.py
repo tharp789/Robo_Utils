@@ -59,7 +59,7 @@ class TartanAirDataLoader:
         
         # load pose file
         self.load_poses(include_panoes=include_panoes)
-        self.save_poses('')
+        # self.save_poses('')
 
         # load image file paths into a dictionaries
         self.depth_img_dict = {}
