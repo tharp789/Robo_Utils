@@ -245,9 +245,45 @@ class TartanAirDataLoader:
             newtransform[:3,:3] = orientation[:3,:3]
             return newtransform
     
+def convert_pose_file(input_path, output_path, c2im):
+
+    ned2cv = np.array([[0,1,0,0],
+                [0,0,1,0],
+                [1,0,0,0],
+                [0,0,0,1]], dtype=np.float32)
+    cv2ned = np.linalg.inv(ned2cv)
+
+    temp = np.eye(4)
+    temp[:3,:3] = c2im
+    c2im = temp
+
+    with open(input_path, "r") as in_file:
+        with open(output_path, "w") as out_file:
+            lines = in_file.readlines()
+            for i, line in enumerate(lines):
+                c2w_ned = np.array(list(map(float, line.split())))
+                c2w_ned = make_transform_q(c2w_ned[3:], c2w_ned[:3])
+
+                im2w_cv = ned2cv @ c2w_ned @ cv2ned @ c2im
+                
+                quat = rot2quat(im2w_cv[:3,:3])
+                t = im2w_cv[:3,3]
+                out_file.write(f"{t[0]} {t[1]} {t[2]} {quat[0]} {quat[1]} {quat[2]} {quat[3]}\n")
+    
+    print("Pose file converted")
+    
 
         
 if __name__ == '__main__':
-    data_loader = TartanAirDataLoader('/media/tyler/Extreme SSD/Gascola_Processed_Top_Cams_04092024/','Pose_easy_000', include_panoes=True)
-    rgb_img, depth_img, pose = data_loader.get_one_frame(0)
-    print("RGB Image shape: ", rgb_img['cam0'].shape)
+    # data_loader = TartanAirDataLoader('/media/tyler/Extreme SSD/Gascola_Processed_Top_Cams_04092024/','Pose_easy_000', include_panoes=True)
+    # rgb_img, depth_img, pose = data_loader.get_one_frame(0)
+    # print("RGB Image shape: ", rgb_img['cam0'].shape)
+
+    input_path = "/home/tyler/Documents/SplaTAM/data/TartanAir/cam_0_poses_ned.txt"
+    output_path = "/home/tyler/Documents/SplaTAM/data/TartanAir/cam_0_poses_cv.txt"
+    c2im = np.array([[-1.0,  0.0,  0.0],
+                     [0.0,  1.0,  0.0],
+                     [0.0,  0.0,  -1.0]])
+    
+    convert_pose_file(input_path, output_path, c2im)
+
