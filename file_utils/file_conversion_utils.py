@@ -39,7 +39,6 @@ def convert_folder(input_folder, output_folder, conversion_function):
             print(f"Processed: {i+1}/{total_files} images")
     print(f"Finished processing all images from {input_folder} to {output_folder}")
 
-
 def split_folder_by_file(input_folder, file_names, output_folder_names):
     assert len(file_names) == len(output_folder_names), "Number of file names and output folders must match."
     top_folder = os.path.dirname(input_folder)
@@ -92,9 +91,15 @@ if __name__ == "__main__":
     # output_folder = '/media/tyler/Extreme SSD/zed2data/cam_poses.txt'
     # numpy_to_txt(input_folder, output_folder)
     # hmmm = cv2.imread('/home/tyler/Documents/SplaTAM/data/Replica/office0/results/depth000000.png')
-    input_folder = '/home/tyler/Documents/SplaTAM/data/RealWorld/depth_processed/'
-    output_folder = '/home/tyler/Documents/SplaTAM/data/RealWorld/depth/'
-    convert_folder(input_folder, output_folder, numpy_to_png)
+
+    input_folder = '/media/tyler/Extreme SSD/Depth_Est_Data/cam0/'
+    output_folder = '/media/tyler/Extreme SSD/Depth_Est_Data/depth_compressed/'
+    takeout_file_type(input_folder, 'Distance', output_folder, copy=False)
+
+
+    # input_folder = '/home/tyler/Documents/SplaTAM/data/RealWorld/depth_processed/'
+    # output_folder = '/home/tyler/Documents/SplaTAM/data/RealWorld/depth/'
+    # convert_folder(input_folder, output_folder, numpy_to_png)
 
 
 

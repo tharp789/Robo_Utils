@@ -61,9 +61,14 @@ def read_and_enhance_thermals(data_path, output_data_path, type):
             cv2.imwrite(output_data_path + file, img)
             print("Processed: " + str(i) + " / " + str(tot_img_num) + " images")
 
+def enhance_thermal_image(image_path, output_path, type):
+    img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
+    img = process_image(img, type)
+    cv2.imwrite(output_path, img)
+
 if __name__ == '__main__':
-    data_path = '/media/tyler/T7/thermal_inference/'
-    output_data_path = '/media/tyler/T7/thermal_inference/enhanced/'
+    # data_path = '/media/tyler/T7/thermal_inference/'
+    # output_data_path = '/media/tyler/T7/thermal_inference/enhanced/'
     # data_path = '/media/tyler/T7/field_dataset/frick_2_train/img_left/'
     # output_data_path = '/media/tyler/T7/field_dataset/frick_2_train/enhanced_left/'
     # data_path = '/media/tyler/T7/field_dataset/hawkins_3_train/img_left/'
@@ -72,4 +77,8 @@ if __name__ == '__main__':
     # output_data_path = '/media/tyler/T7/field_dataset/hawkins_1_1_train/enhanced_left/'
     # data_path = '/media/tyler/T7/field_dataset/hawkins_4_train/img_left/'
     # output_data_path = '/media/tyler/T7/field_dataset/hawkins_4_train/enhanced_left/'
-    read_and_enhance_thermals(data_path, output_data_path, "hist_99")
+    # read_and_enhance_thermals(data_path, output_data_path, "hist_99")
+
+    image_path = '/media/tyler/Extreme SSD/thermal_depth/07242.png'
+    output_path = '/media/tyler/Extreme SSD/thermal_depth/07242_enhanced.png'
+    enhance_thermal_image(image_path, output_path, "hist_99")
