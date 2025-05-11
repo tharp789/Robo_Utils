@@ -54,6 +54,7 @@ def load_image(file_path):
 
 def convert_dist_to_color(depth, max_dist=10.0):
     # Normalize the depth for visualization
+    depth[np.isnan(depth)] = 0
     if max_dist is not None:
         depth = np.clip(depth, 0, max_dist)
     depth = (depth - np.min(depth)) / (np.max(depth) - np.min(depth))
@@ -61,16 +62,22 @@ def convert_dist_to_color(depth, max_dist=10.0):
     depth = cv2.applyColorMap(depth, cv2.COLORMAP_JET)
     return depth
 
-def convert_folder_to_depth_images(input_folder, output_folder, max_dist=30.0):
+def convert_folder_to_depth_images(input_folder, output_folder, max_dist=30.0, compressed=False):
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
     file_list = os.listdir(input_folder)
     file_list.sort()
     tot_img_num = len(file_list)
     for i, file in enumerate(file_list):
-        if "png" in file:
+        if "png" in file and compressed:
             assert os.path.exists(input_folder + file), "File not found: " + input_folder + file
             img = load_depth(input_folder + file)
+            img = convert_dist_to_color(img, max_dist=max_dist)
+            cv2.imwrite(output_folder + file, img)
+            print("Processed: " + str(i+1) + " / " + str(tot_img_num) + " images")
+        if "png" in file and not compressed:
+            assert os.path.exists(input_folder + file), "File not found: " + input_folder + file
+            img = cv2.imread(input_folder + file, cv2.IMREAD_UNCHANGED)
             img = convert_dist_to_color(img, max_dist=max_dist)
             cv2.imwrite(output_folder + file, img)
             print("Processed: " + str(i+1) + " / " + str(tot_img_num) + " images")
@@ -142,9 +149,6 @@ if __name__ == '__main__':
     # depth = convert_dist_to_color(depth, max_dist=30.0)
     # cv2.imwrite('pinhole_depth_image.png', depth)
 
-    input = '/media/tyler/Extreme SSD/Gascola_Processed_Top_Cams_04092024/Gascola_RawData/Pose_easy_000/rig/000000_DepthScene.png'
-    output = '/home/tyler/Downloads/output.png'
-    depth = read_compressed_float(input)
-    depth = convert_dist_to_color(depth, max_dist=30.0)
-    depth_half = depth[0:depth.shape[0]//2, :]
-    cv2.imwrite(output, depth_half)
+    input = '/media/tyler/T7/wire_detection_bags/outside_test_4_extracted/depth/'
+    output = '/media/tyler/T7/wire_detection_bags/outside_test_4_extracted/viz_depth/'
+    convert_folder_to_depth_images(input, output, max_dist=30.0, compressed=False)

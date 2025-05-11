@@ -67,8 +67,8 @@ def extract_pointclouds_from_rosbag(rosbag_file_path, output_location, topic_nam
                 pointcloud_count+=1
 
 if __name__ == "__main__":
-    rosbag_file = "/media/tyler/Extreme SSD/Field_Tests/Gascola/run3_static/lidar_points.bag"
+    rosbag_file = "/media/tyler/T7/wire_detection_bags/outside_test_4"
 
-    output_folder = "/media/tyler/Extreme SSD/Field_Tests/Gascola/run3_static/pcd_files/"
+    output_folder = "/media/tyler/T7/wire_detection_bags/outside_test_4/rgb_images"
 
-    extract_pointclouds_from_rosbag(rosbag_file, output_folder, topic_name='/velodyne_points')
+    extract_pointclouds_from_rosbag(rosbag_file, output_folder, topic_name='/zed/zed_node/rgb/image_rect_color')
