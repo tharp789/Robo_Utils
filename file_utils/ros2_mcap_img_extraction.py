@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 from cv_bridge import CvBridge
 from mcap.reader import make_reader
+from mcap_ros2.decoder import DecoderFactory as Ros2DecoderFactory
 from rosidl_runtime_py.utilities import get_message
 import rclpy
 from rclpy.serialization import deserialize_message
@@ -11,56 +12,107 @@ from sensor_msgs.msg import Image
 
 
 class McapImageExtractor(Node):
-    def __init__(self, bag_path, output_folder, topic_name='/rgb_image'):
+    def __init__(self, bag_folder, rgb_topic_name, depth_topic_name, 
+                 depth_camera_info_topic_name, rgb_camera_info_topic_name):
         super().__init__('mcap_image_extractor')
-        self.bag_path = bag_path
-        self.output_folder = output_folder
-        self.topic_name = topic_name
+        self.bag_folder = bag_folder
+        self.rgb_topic_name = rgb_topic_name
+        self.depth_topic_name = depth_topic_name
+        self.depth_camera_info_topic_name = depth_camera_info_topic_name
+        self.rgb_camera_info_topic_name = rgb_camera_info_topic_name
+        self.rgb_camera_info = None
+        self.depth_camera_info = None
         self.bridge = CvBridge()
         self.image_count = 0
+        self.camera_info_processed = {}
+
+        self.rgb_output_folder = os.path.join(self.bag_folder, "rgb_images")
+        self.depth_output_folder = os.path.join(self.bag_folder, "depth_images")
+        self.depth_viz_output_folder = os.path.join(self.bag_folder, "depth_viz_images")
 
         # Ensure output folder exists
-        if not os.path.exists(self.output_folder):
-            os.makedirs(self.output_folder, exist_ok=True)
+        if not os.path.exists(self.rgb_output_folder):
+            os.makedirs(self.rgb_output_folder, exist_ok=True)
+        if not os.path.exists(self.depth_output_folder):
+            os.makedirs(self.depth_output_folder, exist_ok=True)
+        if not os.path.exists(self.depth_viz_output_folder):
+            os.makedirs(self.depth_viz_output_folder, exist_ok=True)
 
     def extract_images(self):
-        with open(self.bag_path, "rb") as f:
-            reader = make_reader(f)
-            schema_dict = {}
-            topic_type_map = {}
+        for filename in os.listdir(self.bag_folder):
+            if filename.endswith(".mcap"):
+                with open(os.path.join(self.bag_folder, filename), 'rb') as f:
+                    reader = make_reader(f, decoder_factories=[Ros2DecoderFactory()])
+                    for msg_view in reader.iter_decoded_messages():
+                        if msg_view.channel.topic == self.rgb_topic_name:
+                            msg_type_str = msg_view.schema.name
+                            msg_type = get_message(msg_type_str)
+                            timestamp = msg_view.message.log_time
+                            self.process_rgb_image(msg_view.message.data, timestamp, msg_type)
 
-            for schema in reader.schemas:
-                schema_dict[schema.id] = schema
+                        elif msg_view.channel.topic == self.depth_topic_name:
+                            msg_type_str = msg_view.schema.name
+                            msg_type = get_message(msg_type_str)
+                            timestamp = msg_view.message.log_time
+                            self.process_depth_image(msg_view.message.data, timestamp, msg_type)
 
-            for channel in reader.channels:
-                schema = schema_dict[channel.schema_id]
-                topic_type_map[channel.topic] = schema.name
+                        elif msg_view.channel.topic in [self.depth_camera_info_topic_name, self.rgb_camera_info_topic_name]:
+                            msg_type_str = msg_view.schema.name
+                            msg_type = get_message(msg_type_str)
+                            timestamp = msg_view.message.log_time
+                            self.process_camera_info(
+                                msg_view.message.data,
+                                msg_type,
+                                msg_view.channel.topic  # pass topic string
+                            )
+ 
+                self.get_logger().info(f"Saved {self.image_count} images to {self.rgb_output_folder} and {self.depth_output_folder}")
 
-            for msg in reader.iter_messages(topics=[self.topic_name]):
-                msg_type_str = topic_type_map.get(msg.channel.topic)
-                if not msg_type_str:
-                    continue
-                msg_type = get_message(msg_type_str)
-                self.process_image(msg.data, msg.log_time, msg_type)
-
-        self.get_logger().info(f"Saved {self.image_count} images to {self.output_folder}")
-
-    def process_image(self, raw_data, timestamp, msg_type):
+    def process_rgb_image(self, raw_data, timestamp, msg_type):
         try:
             msg = deserialize_message(raw_data, msg_type)
             cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
-            if 'depth' in self.topic_name:
-                cv_image = self.create_depth_viz(cv_image)
             timestamp_ns = str(timestamp)
-            if cv_image.dtype == np.float32:
-                filename = os.path.join(self.output_folder, f"{timestamp_ns}.npy")
-                np.save(filename, cv_image)
-            else:
-                filename = os.path.join(self.output_folder, f"{timestamp_ns}.png")
-                cv2.imwrite(filename, cv_image)
+            filename = os.path.join(self.rgb_output_folder, f"{timestamp_ns}.png")
+            cv2.imwrite(filename, cv_image)
             self.image_count += 1
         except Exception as e:
             self.get_logger().error(f"Failed to process image: {e}")
+
+    def process_depth_image(self, raw_data, timestamp, msg_type):
+        try:
+            msg = deserialize_message(raw_data, msg_type)
+            depth = self.bridge.imgmsg_to_cv2(msg, desired_encoding="passthrough")
+            depth_viz = self.create_depth_viz(depth)
+            timestamp_ns = str(timestamp)
+            viz_filename = os.path.join(self.depth_viz_output_folder, f"{timestamp_ns}_viz.png")
+            depth_filename = os.path.join(self.depth_output_folder, f"{timestamp_ns}.npy")
+            np.save(depth_filename, depth)
+            depth_viz = cv2.cvtColor(depth_viz, cv2.COLOR_BGR2RGB)
+            cv2.imwrite(viz_filename, depth_viz)
+            self.image_count += 1
+        except Exception as e:
+            self.get_logger().error(f"Failed to process depth image: {e}")
+
+    def process_camera_info(self, raw_data, msg_type, topic):
+        try:
+            if self.camera_info_processed.get(topic):
+                return  # Already processed
+
+            msg = deserialize_message(raw_data, msg_type)
+            camera_intrinsics = np.array(msg.k).reshape(3, 3)
+
+            # Save intrinsics to file, e.g., rgb_camera_intrinsics.npy or depth_camera_intrinsics.npy
+            suffix = "depth" if "depth" in topic else "rgb"
+            intrinsics_filename = os.path.join(self.bag_folder, f"{suffix}_camera_intrinsics.npy")
+            np.save(intrinsics_filename, camera_intrinsics)
+
+            self.camera_info_processed[topic] = True
+            self.get_logger().info(f"{suffix.capitalize()} Camera intrinsics: {camera_intrinsics}")
+
+        except Exception as e:
+            self.get_logger().error(f"Failed to process camera info: {e}")
+
 
     def create_depth_viz(self, depth):
         min_depth = 0.5
@@ -77,11 +129,15 @@ class McapImageExtractor(Node):
 
 def main():
     rclpy.init()
-    bag_path = "/media/tyler/Storage/field_tests/street_wire_experiments/wire_tracking_05-07_40fov/wire_tracking_0.mcap"
-    output_folder = "/media/tyler/Storage/field_tests/street_wire_experiments/wire_tracking_05-07_40fov/rgb"
-    topic_name = '/wire_cam/zed_node/rgb/image_rect_color'
+    bag_folder = "/media/tyler/Storage/field_tests/street_wire_experiments/wire_tracking_05-07_40fov/"
+    rgb_topic_name = '/wire_cam/zed_node/left/image_rect_color'
+    depth_topic_name = '/wire_cam/zed_node/depth/depth_registered'
+    depth_camera_info_topic_name = '/wire_cam/zed_node/depth/camera_info'
+    rgb_camera_info_topic_name = '/wire_cam/zed_node/left/camera_info'
+
     try:
-        extractor = McapImageExtractor(bag_path, output_folder, topic_name=topic_name)
+        extractor = McapImageExtractor(bag_folder, rgb_topic_name, depth_topic_name, 
+                                       depth_camera_info_topic_name, rgb_camera_info_topic_name)
         extractor.extract_images()
     finally:
         rclpy.shutdown()
