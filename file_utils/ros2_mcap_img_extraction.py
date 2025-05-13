@@ -26,6 +26,12 @@ class McapImageExtractor(Node):
         self.image_count = 0
         self.camera_info_processed = {}
 
+        if not os.path.isdir(self.bag_folder):
+            self.bag_files = [self.bag_folder]
+            self.bag_folder = os.path.dirname(self.bag_folder)
+        else:
+            self.bag_files = [os.path.join(self.bag_folder, f) for f in os.listdir(self.bag_folder) if f.endswith('.mcap')]
+
         self.rgb_output_folder = os.path.join(self.bag_folder, "rgb_images")
         self.depth_output_folder = os.path.join(self.bag_folder, "depth_images")
         self.depth_viz_output_folder = os.path.join(self.bag_folder, "depth_viz_images")
@@ -39,9 +45,8 @@ class McapImageExtractor(Node):
             os.makedirs(self.depth_viz_output_folder, exist_ok=True)
 
     def extract_images(self):
-        for filename in os.listdir(self.bag_folder):
-            if filename.endswith(".mcap"):
-                with open(os.path.join(self.bag_folder, filename), 'rb') as f:
+        for filename in self.bag_files:
+                with open(filename, 'rb') as f:
                     reader = make_reader(f, decoder_factories=[Ros2DecoderFactory()])
                     for msg_view in reader.iter_decoded_messages():
                         if msg_view.channel.topic == self.rgb_topic_name:
@@ -129,7 +134,7 @@ class McapImageExtractor(Node):
 
 def main():
     rclpy.init()
-    bag_folder = "/media/tyler/Storage/field_tests/street_wire_experiments/wire_tracking_05-07_40fov/"
+    bag_folder = "/media/tyler/Storage/field_tests/acfa_3-21/wire_data_03-21_short.mcap"
     rgb_topic_name = '/wire_cam/zed_node/left/image_rect_color'
     depth_topic_name = '/wire_cam/zed_node/depth/depth_registered'
     depth_camera_info_topic_name = '/wire_cam/zed_node/depth/camera_info'
