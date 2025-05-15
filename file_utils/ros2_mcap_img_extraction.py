@@ -93,7 +93,6 @@ class McapImageExtractor(Node):
             viz_filename = os.path.join(self.depth_viz_output_folder, f"{timestamp_ns}_viz.png")
             depth_filename = os.path.join(self.depth_output_folder, f"{timestamp_ns}.npy")
             np.save(depth_filename, depth)
-            depth_viz = cv2.cvtColor(depth_viz, cv2.COLOR_BGR2RGB)
             cv2.imwrite(viz_filename, depth_viz)
             self.image_count += 1
         except Exception as e:
@@ -134,7 +133,7 @@ class McapImageExtractor(Node):
 
 def main():
     rclpy.init()
-    bag_folder = "/media/tyler/Storage/field_tests/acfa_3-21/wire_data_03-21_short.mcap"
+    bag_folder = "/media/tyler/Storage/field_tests/street_wire_experiments/wire_tracking_05-07_40fov/wire_tracking_0.mcap"
     rgb_topic_name = '/wire_cam/zed_node/left/image_rect_color'
     depth_topic_name = '/wire_cam/zed_node/depth/depth_registered'
     depth_camera_info_topic_name = '/wire_cam/zed_node/depth/camera_info'
