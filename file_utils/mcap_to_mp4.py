@@ -21,8 +21,8 @@ class McapToMp4(Node):
         self.depth_topic_name = depth_topic_name
         self.depth_camera_info_topic_name = depth_camera_info_topic_name
         self.rgb_camera_info_topic_name = rgb_camera_info_topic_name
-        self.rgb_camera_info = None
         self.depth_camera_info = None
+        self.rgb_camera_info = None
         self.bridge = CvBridge()
         self.image_count = 0
         self.camera_info_processed = {}

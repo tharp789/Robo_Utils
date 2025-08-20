@@ -140,6 +140,29 @@ def convert_depth_folder_to_colormap(input_folder, output_folder, show_img=False
             cv2.imwrite(output_folder + file, img)
             print("Processed: " + str(i+1) + " / " + str(tot_img_num) + " images")
 
+def create_video_from_img_folder(image_folder_path, output_video_path, fps=30):
+    images = [img for img in os.listdir(image_folder_path) if img.endswith(".png")]
+    images.sort()  # Sort images to maintain order
+    if not images:
+        print("No images found in the folder.")
+        return
+
+    first_image = cv2.imread(os.path.join(image_folder_path, images[0]))
+    height, width, layers = first_image.shape
+
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Use 'XVID' for .avi files
+    video_writer = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
+
+    for image in images:
+        img_path = os.path.join(image_folder_path, image)
+        frame = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
+        if frame.shape[2] == 4:
+            frame = cv2.cvtColor(frame, cv2.COLOR_RGBA2RGB)
+        video_writer.write(frame)
+
+    video_writer.release()
+    print(f"Video saved to {output_video_path}")
+
 if __name__ == '__main__':
     # print('Testing image_utils.py')
     # img = read_image('test_rgb_image.png')
@@ -149,6 +172,8 @@ if __name__ == '__main__':
     # depth = convert_dist_to_color(depth, max_dist=30.0)
     # cv2.imwrite('pinhole_depth_image.png', depth)
 
-    input = '/media/tyler/T7/wire_detection_bags/outside_test_4_extracted/depth/'
-    output = '/media/tyler/T7/wire_detection_bags/outside_test_4_extracted/viz_depth/'
-    convert_folder_to_depth_images(input, output, max_dist=30.0, compressed=False)
+    input = '/media/tyler/Storage/field_tests/mill19_070225_handheld_wire/ransac_results_2d/'
+    output = '/media/tyler/Storage/field_tests/mill19_070225_handheld_wire/ransac_results_2d.mp4'
+    img = cv2.imread(input + '1751490105446893120_2d.png', cv2.IMREAD_UNCHANGED)
+    create_video_from_img_folder(input, output, fps=20)
+    # convert_folder_to_depth_images(input, output, max_dist=30.0, compressed=False)
