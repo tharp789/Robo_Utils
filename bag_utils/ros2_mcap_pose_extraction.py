@@ -59,9 +59,9 @@ class McapPoseExtractor(Node):
 
 def main():
     rclpy.init()
-    bag_path = "/media/tyler/Storage/field_tests/250815_vtolwire_2/wire_tracking_short.mcap"
+    bag_path = "/media/tyler/Storage/field_tests/250815_vtolwire_1/wire_tracking_short.mcap"
     pose_topic_name = "/mavros/local_position/pose"
-    csv_output_path = "/media/tyler/Storage/field_tests/250815_vtolwire_2/pose_data.csv"
+    csv_output_path = "/media/tyler/Storage/field_tests/250815_vtolwire_1/pose_data.csv"
     extractor = McapPoseExtractor(bag_path, pose_topic_name, csv_output_path)
     extractor.extract_poses()
     rclpy.shutdown()
